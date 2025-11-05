@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const StatementTable = ({ statements, columns, hiddenColumns, onUpdate, onSelectStatement, selectedStatement }) => {
+const StatementTable = ({ statements, columns, hiddenColumns, onUpdate, onSelectStatement, selectedStatement, selectedStatements = [], onToggleSelect }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [editingCell, setEditingCell] = useState(null);
 
