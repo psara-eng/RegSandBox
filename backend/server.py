@@ -512,6 +512,219 @@ async def get_document_preview(document_id: str):
         "file_content_base64": document.get('file_content_base64', '')
     }
 
+# Restructuring Endpoints
+@api_router.post("/documents/{document_id}/split")
+async def split_statement(document_id: str, request: SplitRequest):
+    """Split a statement into multiple children"""
+    # Get base statement
+    base_stmt = await db.statements.find_one({"sys_id": request.base_sys_id}, {"_id": 0})
+    if not base_stmt:
+        raise HTTPException(status_code=404, detail="Base statement not found")
+    
+    # Create split children
+    children = []
+    for idx, split in enumerate(request.splits):
+        child = Statement(
+            document_id=document_id,
+            sys_id=str(uuid.uuid4()),
+            hierarchy_path=base_stmt['hierarchy_path'],
+            section_ref=base_stmt['section_ref'],
+            section_title=base_stmt['section_title'],
+            page_number=base_stmt['page_number'],
+            regulation_text=base_stmt['regulation_text'][split['start']:split['end']],
+            statement_type=base_stmt['statement_type'],
+            parent_sys_id=request.base_sys_id,
+            user_edit_kind="split_child",
+            user_section_ref=split.get('user_section_ref', f"{base_stmt['section_ref']}-{idx+1}"),
+            order_index=idx,
+            provenance={
+                "source_sys_ids": [request.base_sys_id],
+                "source_span": {"start": split['start'], "end": split['end']},
+                "op_history": [{
+                    "operation": "split",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "base_sys_id": request.base_sys_id
+                }]
+            }
+        )
+        
+        if request.inherit_user_cols:
+            child.custom_fields = base_stmt.get('custom_fields', {})
+        
+        child_dict = child.model_dump()
+        child_dict['created_at'] = child_dict['created_at'].isoformat()
+        children.append(child_dict)
+    
+    # Insert children
+    if children:
+        await db.statements.insert_many(children)
+    
+    # Mark base as superseded
+    await db.statements.update_one(
+        {"sys_id": request.base_sys_id},
+        {"$set": {"is_superseded": True}}
+    )
+    
+    return {"message": f"Split into {len(children)} children", "children": children}
+
+@api_router.post("/documents/{document_id}/merge")
+async def merge_statements(document_id: str, request: MergeRequest):
+    """Merge multiple statements into one"""
+    # Get source statements
+    source_stmts = await db.statements.find({"sys_id": {"$in": request.sys_ids}}, {"_id": 0}).to_list(100)
+    if len(source_stmts) != len(request.sys_ids):
+        raise HTTPException(status_code=404, detail="Some statements not found")
+    
+    # Sort by order_index
+    source_stmts.sort(key=lambda x: x.get('order_index', 0))
+    
+    # Combine texts
+    combined_text = request.delimiter.join([s['regulation_text'] for s in source_stmts])
+    
+    # Create merge result
+    first_stmt = source_stmts[0]
+    merged = Statement(
+        document_id=document_id,
+        sys_id=str(uuid.uuid4()),
+        hierarchy_path=first_stmt['hierarchy_path'],
+        section_ref=first_stmt['section_ref'],
+        section_title=first_stmt['section_title'],
+        page_number=first_stmt['page_number'],
+        regulation_text=combined_text,
+        statement_type=first_stmt['statement_type'],
+        user_edit_kind="merge_result",
+        user_section_ref=request.user_section_ref or first_stmt.get('section_ref'),
+        order_index=first_stmt.get('order_index', 0),
+        provenance={
+            "source_sys_ids": request.sys_ids,
+            "source_span": None,
+            "op_history": [{
+                "operation": "merge",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "source_sys_ids": request.sys_ids,
+                "delimiter": request.delimiter
+            }]
+        }
+    )
+    
+    merged_dict = merged.model_dump()
+    merged_dict['created_at'] = merged_dict['created_at'].isoformat()
+    
+    await db.statements.insert_one(merged_dict)
+    
+    # Mark sources as superseded
+    await db.statements.update_many(
+        {"sys_id": {"$in": request.sys_ids}},
+        {"$set": {"is_superseded": True}}
+    )
+    
+    return {"message": "Statements merged", "merged": merged_dict}
+
+@api_router.post("/documents/{document_id}/group")
+async def group_statements(document_id: str, request: GroupRequest):
+    """Group statements under a parent"""
+    # Verify statements exist
+    existing = await db.statements.count_documents({"sys_id": {"$in": request.sys_ids}})
+    if existing != len(request.sys_ids):
+        raise HTTPException(status_code=404, detail="Some statements not found")
+    
+    # Create group parent
+    group_parent = Statement(
+        document_id=document_id,
+        sys_id=str(uuid.uuid4()),
+        hierarchy_path=request.title,
+        section_ref=request.title,
+        section_title=request.title,
+        page_number=None,
+        regulation_text="",  # Group has no content
+        statement_type="Definition",
+        user_edit_kind="group_parent",
+        user_section_ref=request.title,
+        order_index=0,
+        provenance={
+            "source_sys_ids": request.sys_ids,
+            "source_span": None,
+            "op_history": [{
+                "operation": "group",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "grouped_sys_ids": request.sys_ids
+            }]
+        }
+    )
+    
+    parent_dict = group_parent.model_dump()
+    parent_dict['created_at'] = parent_dict['created_at'].isoformat()
+    
+    await db.statements.insert_one(parent_dict)
+    
+    # Update children to point to parent
+    await db.statements.update_many(
+        {"sys_id": {"$in": request.sys_ids}},
+        {"$set": {"parent_sys_id": group_parent.sys_id}}
+    )
+    
+    return {"message": "Statements grouped", "group_parent": parent_dict}
+
+@api_router.patch("/documents/{document_id}/reorder")
+async def reorder_statements(document_id: str, request: ReorderRequest):
+    """Reorder statements within a parent"""
+    for idx, sys_id in enumerate(request.ordered_sys_ids):
+        await db.statements.update_one(
+            {"sys_id": sys_id},
+            {"$set": {"order_index": float(idx)}}
+        )
+    
+    return {"message": "Statements reordered"}
+
+@api_router.delete("/documents/{document_id}/ungroup/{sys_id}")
+async def ungroup_statement(document_id: str, sys_id: str):
+    """Remove a statement from its group"""
+    await db.statements.update_one(
+        {"sys_id": sys_id},
+        {"$set": {"parent_sys_id": None}}
+    )
+    return {"message": "Statement ungrouped"}
+
+@api_router.get("/documents/{document_id}/provenance/{sys_id}")
+async def get_provenance(document_id: str, sys_id: str):
+    """Get full provenance for a statement"""
+    stmt = await db.statements.find_one({"sys_id": sys_id}, {"_id": 0})
+    if not stmt:
+        raise HTTPException(status_code=404, detail="Statement not found")
+    
+    return {
+        "sys_id": sys_id,
+        "user_edit_kind": stmt.get('user_edit_kind'),
+        "provenance": stmt.get('provenance'),
+        "is_superseded": stmt.get('is_superseded'),
+        "parent_sys_id": stmt.get('parent_sys_id')
+    }
+
+@api_router.post("/documents/{document_id}/undo")
+async def undo_operation(document_id: str):
+    """Undo last operation (simplified - stores last 20 operations)"""
+    # Get undo stack from a separate collection
+    undo_stack = await db.undo_stack.find({"document_id": document_id}).sort("timestamp", -1).limit(1).to_list(1)
+    
+    if not undo_stack:
+        raise HTTPException(status_code=404, detail="No operations to undo")
+    
+    operation = undo_stack[0]
+    
+    # Restore snapshot data
+    for sys_id, data in operation['snapshot_data'].items():
+        if data is None:
+            # Delete statement (it was created by the operation)
+            await db.statements.delete_one({"sys_id": sys_id})
+        else:
+            # Restore previous state
+            await db.statements.replace_one({"sys_id": sys_id}, data, upsert=True)
+    
+    # Remove from undo stack
+    await db.undo_stack.delete_one({"_id": operation['_id']})
+    
+    return {"message": "Operation undone"}
+
 # Include the router in the main app
 app.include_router(api_router)
 
