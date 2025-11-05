@@ -200,8 +200,12 @@ const StatementTable = ({ statements, columns, hiddenColumns, onUpdate, onSelect
           {sortedStatements.map(stmt => (
             <tr
               key={stmt.id}
-              className={selectedStatement?.id === stmt.id ? 'bg-blue-50' : ''}
-              onClick={() => onSelectStatement(stmt)}
+              className={`${
+                selectedStatements.some(s => s.sys_id === stmt.sys_id) ? 'bg-blue-100' :
+                selectedStatement?.id === stmt.id ? 'bg-blue-50' : 
+                stmt.is_superseded ? 'opacity-50' : ''
+              } ${stmt.user_edit_kind === 'group_parent' ? 'font-medium' : ''}`}
+              onClick={(e) => handleRowClick(stmt, e)}
               data-testid={`statement-row-${stmt.id}`}
             >
               {!hiddenColumns.includes('hierarchy_path') && (
