@@ -475,12 +475,14 @@ const WorkspacePage = () => {
         {/* Table Area */}
         <div className={`flex-1 overflow-auto p-6 ${showPreview ? 'w-2/3' : 'w-full'}`}>
           <StatementTable
-            statements={filteredStatements}
+            statements={filteredStatements.filter(s => !filterSuperseded || !s.is_superseded)}
             columns={columns}
             hiddenColumns={hiddenColumns}
             onUpdate={handleUpdateStatement}
             onSelectStatement={setSelectedStatement}
             selectedStatement={selectedStatement}
+            selectedStatements={selectedStatements}
+            onToggleSelect={handleToggleSelect}
           />
         </div>
 
@@ -495,6 +497,41 @@ const WorkspacePage = () => {
           </div>
         )}
       </div>
+
+      {/* Statement Toolbar */}
+      <StatementToolbar
+        selectedStatements={selectedStatements}
+        onSplit={() => setShowSplitDialog(true)}
+        onMerge={() => setShowMergeDialog(true)}
+        onGroup={() => setShowGroupDialog(true)}
+        onDelete={handleDeleteSelected}
+        onMoveUp={handleMoveUp}
+        onMoveDown={handleMoveDown}
+        canMerge={canMerge}
+        canGroup={canGroup}
+      />
+
+      {/* Dialogs */}
+      <SplitDialog
+        open={showSplitDialog}
+        onOpenChange={setShowSplitDialog}
+        statement={selectedStatements[0]}
+        onSplit={handleSplit}
+      />
+
+      <MergeDialog
+        open={showMergeDialog}
+        onOpenChange={setShowMergeDialog}
+        statements={selectedStatements}
+        onMerge={handleMerge}
+      />
+
+      <GroupDialog
+        open={showGroupDialog}
+        onOpenChange={setShowGroupDialog}
+        statements={selectedStatements}
+        onGroup={handleGroup}
+      />
     </div>
   );
 };
