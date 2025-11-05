@@ -212,7 +212,13 @@ const StatementTable = ({ statements, columns, hiddenColumns, onUpdate, onSelect
                 <td className="text-xs font-mono">{stmt.hierarchy_path}</td>
               )}
               {!hiddenColumns.includes('section_ref') && (
-                <td className="text-xs font-medium">{stmt.section_ref}</td>
+                <td className="text-xs font-medium">
+                  <div className="flex items-center gap-2">
+                    {stmt.user_section_ref || stmt.section_ref}
+                    {getEditKindBadge(stmt.user_edit_kind)}
+                    {stmt.is_superseded && <span className="text-xs text-slate-400">(superseded)</span>}
+                  </div>
+                </td>
               )}
               {!hiddenColumns.includes('section_title') && (
                 <td className="text-xs">{stmt.section_title || '-'}</td>
