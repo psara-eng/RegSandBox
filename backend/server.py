@@ -53,6 +53,7 @@ class Document(BaseModel):
 class Statement(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    sys_id: str = Field(default_factory=lambda: str(uuid.uuid4()))  # Immutable internal ID
     document_id: str
     hierarchy_path: str
     section_ref: str
@@ -62,6 +63,19 @@ class Statement(BaseModel):
     statement_type: str  # Obligation, Prohibition, Recommendation, Definition, Exception
     custom_fields: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    # Restructuring fields
+    parent_sys_id: Optional[str] = None
+    user_edit_kind: str = "original"  # original, split_child, merge_result, group_parent
+    provenance: Dict[str, Any] = Field(default_factory=lambda: {
+        "source_sys_ids": [],
+        "source_span": None,
+        "op_history": []
+    })
+    user_section_ref: Optional[str] = None
+    lock_original_fields: bool = True
+    order_index: float = 0.0
+    is_superseded: bool = False
 
 class ColumnDefinition(BaseModel):
     model_config = ConfigDict(extra="ignore")
