@@ -725,6 +725,37 @@ async def undo_operation(document_id: str):
     
     return {"message": "Operation undone"}
 
+@api_router.post("/documents/{document_id}/migrate")
+async def migrate_statements(document_id: str):
+    """Migrate existing statements to add new restructuring fields"""
+    statements = await db.statements.find({"document_id": document_id}, {"_id": 0}).to_list(10000)
+    
+    updated_count = 0
+    for stmt in statements:
+        if 'sys_id' not in stmt:
+            update_data = {
+                'sys_id': stmt.get('id'),  # Use existing id as sys_id
+                'parent_sys_id': None,
+                'user_edit_kind': 'original',
+                'provenance': {
+                    'source_sys_ids': [],
+                    'source_span': None,
+                    'op_history': []
+                },
+                'user_section_ref': None,
+                'lock_original_fields': True,
+                'order_index': 0.0,
+                'is_superseded': False
+            }
+            
+            await db.statements.update_one(
+                {"id": stmt['id']},
+                {"$set": update_data}
+            )
+            updated_count += 1
+    
+    return {"message": f"Migrated {updated_count} statements"}
+
 # Include the router in the main app
 app.include_router(api_router)
 
