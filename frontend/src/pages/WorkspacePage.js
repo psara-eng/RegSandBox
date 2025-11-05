@@ -192,6 +192,106 @@ const WorkspacePage = () => {
     );
   };
 
+  // Restructuring handlers
+  const handleToggleSelect = (stmt) => {
+    setSelectedStatements(prev => {
+      const exists = prev.some(s => s.sys_id === stmt.sys_id);
+      if (exists) {
+        return prev.filter(s => s.sys_id !== stmt.sys_id);
+      } else {
+        return [...prev, stmt];
+      }
+    });
+  };
+
+  const handleSplit = async (splitData) => {
+    try {
+      await axios.post(`${API}/documents/${documentId}/split`, splitData);
+      await fetchData();
+      setSelectedStatements([]);
+      toast.success('Statement split successfully');
+    } catch (error) {
+      console.error('Split error:', error);
+      toast.error('Failed to split statement');
+    }
+  };
+
+  const handleMerge = async (mergeData) => {
+    try {
+      await axios.post(`${API}/documents/${documentId}/merge`, mergeData);
+      await fetchData();
+      setSelectedStatements([]);
+      toast.success('Statements merged successfully');
+    } catch (error) {
+      console.error('Merge error:', error);
+      toast.error('Failed to merge statements');
+    }
+  };
+
+  const handleGroup = async (groupData) => {
+    try {
+      await axios.post(`${API}/documents/${documentId}/group`, groupData);
+      await fetchData();
+      setSelectedStatements([]);
+      toast.success('Statements grouped successfully');
+    } catch (error) {
+      console.error('Group error:', error);
+      toast.error('Failed to group statements');
+    }
+  };
+
+  const handleMoveUp = async () => {
+    if (selectedStatements.length !== 1) return;
+    const stmt = selectedStatements[0];
+    const currentIndex = filteredStatements.findIndex(s => s.sys_id === stmt.sys_id);
+    if (currentIndex <= 0) return;
+
+    const reordered = [...filteredStatements];
+    [reordered[currentIndex - 1], reordered[currentIndex]] = [reordered[currentIndex], reordered[currentIndex - 1]];
+
+    try {
+      await axios.patch(`${API}/documents/${documentId}/reorder`, {
+        parent_sys_id: stmt.parent_sys_id,
+        ordered_sys_ids: reordered.map(s => s.sys_id)
+      });
+      await fetchData();
+    } catch (error) {
+      console.error('Reorder error:', error);
+      toast.error('Failed to reorder');
+    }
+  };
+
+  const handleMoveDown = async () => {
+    if (selectedStatements.length !== 1) return;
+    const stmt = selectedStatements[0];
+    const currentIndex = filteredStatements.findIndex(s => s.sys_id === stmt.sys_id);
+    if (currentIndex >= filteredStatements.length - 1) return;
+
+    const reordered = [...filteredStatements];
+    [reordered[currentIndex], reordered[currentIndex + 1]] = [reordered[currentIndex + 1], reordered[currentIndex]];
+
+    try {
+      await axios.patch(`${API}/documents/${documentId}/reorder`, {
+        parent_sys_id: stmt.parent_sys_id,
+        ordered_sys_ids: reordered.map(s => s.sys_id)
+      });
+      await fetchData();
+    } catch (error) {
+      console.error('Reorder error:', error);
+      toast.error('Failed to reorder');
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    // Would implement delete logic here
+    toast.info('Delete functionality coming soon');
+  };
+
+  const canMerge = selectedStatements.length >= 2 && 
+    selectedStatements.every(s => s.parent_sys_id === selectedStatements[0].parent_sys_id);
+
+  const canGroup = selectedStatements.length >= 2;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
