@@ -105,6 +105,31 @@ class DocumentUploadResponse(BaseModel):
     filename: str
     message: str
 
+# Restructuring Models
+class SplitRequest(BaseModel):
+    base_sys_id: str
+    splits: List[Dict[str, Any]]  # [{start, end, user_section_ref?}, ...]
+    inherit_user_cols: bool = False
+
+class MergeRequest(BaseModel):
+    sys_ids: List[str]
+    delimiter: str = "\n"
+    user_section_ref: Optional[str] = None
+
+class GroupRequest(BaseModel):
+    title: str
+    sys_ids: List[str]
+
+class ReorderRequest(BaseModel):
+    parent_sys_id: Optional[str]
+    ordered_sys_ids: List[str]
+
+class UndoRedoState(BaseModel):
+    operation: str
+    timestamp: datetime
+    affected_sys_ids: List[str]
+    snapshot_data: Dict[str, Any]
+
 # Helper Functions
 async def extract_text_from_pdf(file_content: bytes) -> tuple[str, int]:
     """Extract text from PDF and return text with page count"""
