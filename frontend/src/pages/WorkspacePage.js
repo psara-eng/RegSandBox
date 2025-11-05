@@ -299,7 +299,7 @@ const WorkspacePage = () => {
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="z-[60]">
+              <SelectContent className="z-50">
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="Obligation">Obligation</SelectItem>
                 <SelectItem value="Prohibition">Prohibition</SelectItem>
