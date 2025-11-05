@@ -52,6 +52,30 @@ const StatementTable = ({ statements, columns, hiddenColumns, onUpdate, onSelect
     return <span className={styles[type] || 'badge'}>{type}</span>;
   };
 
+  const getEditKindBadge = (kind) => {
+    if (!kind || kind === 'original') return null;
+    const styles = {
+      split_child: 'bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded',
+      merge_result: 'bg-purple-100 text-purple-800 text-xs px-2 py-0.5 rounded',
+      group_parent: 'bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded'
+    };
+    const labels = {
+      split_child: 'Split',
+      merge_result: 'Merged',
+      group_parent: 'Group'
+    };
+    return <span className={styles[kind]}>{labels[kind]}</span>;
+  };
+
+  const handleRowClick = (stmt, e) => {
+    if (e.ctrlKey || e.metaKey) {
+      // Multi-select
+      onToggleSelect?.(stmt);
+    } else {
+      onSelectStatement(stmt);
+    }
+  };
+
   const renderCell = (statement, column) => {
     const value = statement.custom_fields?.[column.name] || '';
     const isEditing = editingCell === `${statement.id}-${column.name}`;
