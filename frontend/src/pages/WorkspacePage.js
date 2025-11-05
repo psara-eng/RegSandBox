@@ -29,6 +29,10 @@ import StatementTable from '../components/StatementTable';
 import AddColumnDialog from '../components/AddColumnDialog';
 import TemplateDialog from '../components/TemplateDialog';
 import PreviewPane from '../components/PreviewPane';
+import StatementToolbar from '../components/StatementToolbar';
+import SplitDialog from '../components/SplitDialog';
+import MergeDialog from '../components/MergeDialog';
+import GroupDialog from '../components/GroupDialog';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -38,6 +42,11 @@ const WorkspacePage = () => {
   const navigate = useNavigate();
   const [document, setDocument] = useState(null);
   const [statements, setStatements] = useState([]);
+  const [selectedStatements, setSelectedStatements] = useState([]);
+  const [showSplitDialog, setShowSplitDialog] = useState(false);
+  const [showMergeDialog, setShowMergeDialog] = useState(false);
+  const [showGroupDialog, setShowGroupDialog] = useState(false);
+  const [filterSuperseded, setFilterSuperseded] = useState(true);
   const [columns, setColumns] = useState([]);
   const [filteredStatements, setFilteredStatements] = useState([]);
   const [loading, setLoading] = useState(true);
