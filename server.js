@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import pdf from 'pdf-parse/lib/pdf-parse.js';
+import pdf from 'pdf-parse';
 import cors from 'cors';
 import fs from 'fs';
 
