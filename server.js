@@ -1,8 +1,13 @@
 import express from 'express';
 import multer from 'multer';
-import pdf from 'pdf-parse';
+import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import cors from 'cors';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const workerSrc = join(__dirname, 'node_modules/pdfjs-dist/build/pdf.worker.mjs');
 
 const app = express();
 const upload = multer({ dest: '/tmp/' });
@@ -17,10 +22,18 @@ app.post('/api/extract', upload.single('file'), async (req, res) => {
     }
 
     const dataBuffer = fs.readFileSync(req.file.path);
-    const data = await pdf(dataBuffer);
+    const loadingTask = pdfjsLib.getDocument({ data: dataBuffer });
+    const pdfDocument = await loadingTask.promise;
     
-    const text = data.text;
-    const rows = extractRows(text);
+    let fullText = '';
+    for (let i = 1; i <= pdfDocument.numPages; i++) {
+      const page = await pdfDocument.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(item => item.str).join(' ');
+      fullText += pageText + '\n\n';
+    }
+    
+    const rows = extractRows(fullText);
     
     // Clean up temp file
     fs.unlinkSync(req.file.path);
