@@ -1,13 +1,13 @@
 import express from 'express';
 import multer from 'multer';
-import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import cors from 'cors';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const workerSrc = join(__dirname, 'node_modules/pdfjs-dist/build/pdf.worker.mjs');
+const workerSrc = join(__dirname, 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
 
 const app = express();
 const upload = multer({ dest: '/tmp/' });
